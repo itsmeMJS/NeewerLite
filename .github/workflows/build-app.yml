@@ -1,0 +1,33 @@
+name: Build app (unsigned, ad-hoc)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/**]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Build Release (ad-hoc signed)
+        working-directory: NeewerLite
+        run: |
+          xcodebuild -project NeewerLite.xcodeproj -scheme NeewerLite \
+            -configuration Release -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build | tail -50
+      - name: Package
+        working-directory: NeewerLite
+        run: |
+          ls build/Build/Products/Release/
+          ditto -c -k --keepParent build/Build/Products/Release/NeewerLite.app NeewerLite-cb120b.zip
+          codesign -dv --verbose=2 build/Build/Products/Release/NeewerLite.app 2>&1 | head -12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeewerLite-cb120b
+          path: NeewerLite/NeewerLite-cb120b.zip
+          retention-days: 30
