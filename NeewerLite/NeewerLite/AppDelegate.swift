@@ -1862,6 +1862,10 @@ extension AppDelegate: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        // A reconnect queued by didDisconnectPeripheral arrives here with a nil delegate,
+        // so discoverServices would report to nobody and the light would stay grayed out
+        // while actually connected. Re-arm the delegate before discovering.
+        peripheral.delegate = self
         // discover all service
         peripheral.discoverServices(nil)
     }
