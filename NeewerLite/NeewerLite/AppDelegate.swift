@@ -1809,6 +1809,29 @@ extension AppDelegate: NSCollectionViewDelegate, NSCollectionViewDataSource {
 
 extension AppDelegate: CBCentralManagerDelegate {
 
+    /// Re-establish saved lights by their stored peripheral identifier.
+    ///
+    /// Scanning alone cannot recover every light: one that macOS already holds a link
+    /// to does not advertise, and one that dropped while the app was closed may not
+    /// advertise again until it is power cycled. retrievePeripherals hands back the
+    /// system's peripheral objects directly, and connect() on each leaves a standing
+    /// request that completes as soon as the light is reachable.
+    private func reconnectSavedLights(_ central: CBCentralManager) {
+        let identifiers = viewObjects.compactMap { UUID(uuidString: $0.deviceIdentifier) }
+        if identifiers.isEmpty {
+            return
+        }
+        for peripheral in central.retrievePeripherals(withIdentifiers: identifiers) {
+            if peripheralCache[peripheral.identifier] != nil {
+                continue
+            }
+            Logger.info(LogTag.bluetooth, "Reconnecting saved light: \(peripheral.identifier)")
+            peripheral.delegate = self
+            peripheralCache[peripheral.identifier] = peripheral
+            central.connect(peripheral, options: nil)
+        }
+    }
+
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
 
         switch central.state {
@@ -1826,6 +1849,7 @@ extension AppDelegate: CBCentralManagerDelegate {
         case .unsupported: break
         case .poweredOn:
             Logger.debug(LogTag.bluetooth, "powered on")
+            reconnectSavedLights(central)
             central.scanForPeripherals(withServices: nil, options: nil)
             // scanAction(self)
             self.scanning = true
